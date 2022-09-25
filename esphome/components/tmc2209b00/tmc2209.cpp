@@ -11,7 +11,7 @@ void TMC2209::setup() {
 
   // this->get_stream()->write("Hello from UART");
 
-  stepper_driver_ = new TMC2209Stepper(this->get_stream(), 0.15f, 0b01);
+  stepper_driver_ = new TMC2209Stepper(this->get_stream(), 0.15f, 0b00);
 
   stepper_driver_->pdn_disable(true);
   stepper_driver_->begin();

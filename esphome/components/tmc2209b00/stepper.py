@@ -37,7 +37,7 @@ CONFIG_SCHEMA = (
 
 
 @automation.register_action(
-    "tmc2209.setup",
+    "tmc2209b00.setup",
     TMC2209SetupAction,
     cv.Schema(
         {
