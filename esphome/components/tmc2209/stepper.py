@@ -73,10 +73,10 @@ def tmc2209_setup_to_code(config, action_id, template_arg, args):
         cg.add(var.set_current(template_))
     if CONF_R_SHUNT in config:
         template_ = yield cg.templatable(config[CONF_R_SHUNT], args, float)
-        cg.add(var.set_current(template_))
+        cg.add(var.set_r_shunt(template_))
     if CONF_TMC_ADDR in config:
         template_ = yield cg.templatable(config[CONF_TMC_ADDR], args, int)
-        cg.add(var.set_current(template_))
+        cg.add(var.set_tmc_address(template_))
 
     yield var
 
