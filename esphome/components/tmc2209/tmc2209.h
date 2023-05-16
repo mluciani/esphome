@@ -61,11 +61,11 @@ template<typename... Ts> class TMC2209SetupAction : public Action<Ts...>, public
       ESP_LOGW("tmc2209", "current %.3f", this->current_.value(x...));
       driver.rms_current(static_cast<int>(this->current_.value(x...) * 1000.0));
     }
-    if (this.tmc_address_.has_value()) {
-      ESP_LOGW("tmc2209", "tmc_address %d", this.tmc_address_.value(x...));
+    if (this->tmc_address_.has_value()) {
+      ESP_LOGW("tmc2209", "tmc_address %d", this->tmc_address_.value(x...));
     }
-    if (this.r_shunt_.has_value()) {
-      ESP_LOGW("tmc2209", "r_shunt_ %.3f", this.r_shunt_.value(x...));
+    if (this->r_shunt_.has_value()) {
+      ESP_LOGW("tmc2209", "r_shunt_ %.3f", this->r_shunt_.value(x...));
     }
   }
 };
