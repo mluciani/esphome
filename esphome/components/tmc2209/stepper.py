@@ -40,13 +40,13 @@ CONFIG_SCHEMA = (
 
 
 @automation.register_action(
-    "tmc2209b00.setup",
+    "tmc2209.setup",
     TMC2209SetupAction,
     cv.Schema(
         {
             cv.GenerateID(): cv.use_id(TMC2209),
-            cv.Required(CONF_R_SHUNT): cv.resistance,
-            cv.Required(CONF_TMC_ADDR): cv.uint8_t,
+            cv.Required(CONF_R_SHUNT): cv.templatable(cv.resistance),
+            cv.Required(CONF_TMC_ADDR): cv.templatable(cv.uint8_t),
             cv.Optional(CONF_MICROSTEPS): cv.templatable(
                 cv.one_of(256, 128, 64, 32, 16, 8, 4, 2, 0)
             ),

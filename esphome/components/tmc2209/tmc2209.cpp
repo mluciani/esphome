@@ -11,7 +11,7 @@ void TMC2209::setup() {
 
   // this->get_stream()->write("Hello from UART");
 
-  stepper_driver_ = new TMC2209Stepper(this->get_stream(), r_shunt_, tmc_address_);
+  stepper_driver_ = new TMC2209Stepper(this->get_stream(), this->r_shunt_, this->tmc_address_);
 
   stepper_driver_->pdn_disable(true);
   stepper_driver_->begin();
@@ -38,8 +38,8 @@ void TMC2209::dump_config() {
   LOG_PIN("  Step Pin: ", this->step_pin_);
   LOG_PIN("  Dir Pin: ", this->dir_pin_);
   LOG_PIN("  Sleep Pin: ", this->sleep_pin_);
-  LOG_PIN("  R shunt: ", r_shunt_);
-  LOG_PIN("  TMC address: ", tmc_address_);
+  LOG_PIN("  R shunt: ", this->r_shunt_);
+  LOG_PIN("  TMC address: ", this->tmc_address_);
   LOG_STEPPER(this);
 }
 void TMC2209::loop() {

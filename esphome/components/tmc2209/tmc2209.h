@@ -30,8 +30,8 @@ class TMC2209 : public stepper::Stepper, public Component, public uart::UARTDevi
   GPIOPin *sleep_pin_{nullptr};
   bool sleep_pin_state_;
   HighFrequencyLoopRequester high_freq_;
-  double r_shunt_;
-  uint8_t tmc_address_;
+  double *r_shunt_;
+  uint8_t *tmc_address_;
 };
 
 template<typename... Ts> class TMC2209SetupAction : public Action<Ts...>, public Parented<TMC2209> {
@@ -61,11 +61,11 @@ template<typename... Ts> class TMC2209SetupAction : public Action<Ts...>, public
       ESP_LOGW("tmc2209", "current %.3f", this->current_.value(x...));
       driver.rms_current(static_cast<int>(this->current_.value(x...) * 1000.0));
     }
-    if (tmc_address_.has_value()) {
-      ESP_LOGW("tmc2209", "tmc_address %d", tmc_address_.value(x...));
+    if (this->tmc_address_.has_value()) {
+      ESP_LOGW("tmc2209", "tmc_address %d", this->tmc_address_.value(x...));
     }
-    if (r_shunt_.has_value()) {
-      ESP_LOGW("tmc2209", "r_shunt_ %.3f", r_shunt_.value(x...));
+    if (this->r_shunt_.has_value()) {
+      ESP_LOGW("tmc2209", "r_shunt_ %.3f", this->r_shunt_.value(x...));
     }
   }
 };
