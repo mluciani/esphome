@@ -38,8 +38,8 @@ void TMC2209::dump_config() {
   LOG_PIN("  Step Pin: ", this->step_pin_);
   LOG_PIN("  Dir Pin: ", this->dir_pin_);
   LOG_PIN("  Sleep Pin: ", this->sleep_pin_);
-  ESP_LOGCONFIG(TAG, "  R Shunt: %f", this->r_shunt_);
-  ESP_LOGCONFIG(TAG, "  TMC Address: 0x%02X", this->tmc_address_);
+  ESP_LOGCONFIG(TAG, "  Current Sense Resistor: %f", this.sense_resistor_);
+  ESP_LOGCONFIG(TAG, "  TMC Address: 0x%02X", this.uart_address_);
   LOG_STEPPER(this);
 }
 void TMC2209::loop() {
