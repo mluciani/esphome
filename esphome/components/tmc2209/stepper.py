@@ -30,9 +30,8 @@ CONF_STEPPERS = "steppers"
 # modify CONFIG_SCHEMA to include the new parameters and to handle multiple steppers
 CONFIG_SCHEMA = cv.All(
     cv.Schema({
-        cv.GenerateID(): cv.declare_id(TMC2209),
         cv.Required(CONF_STEPPERS): cv.All(cv.ensure_list(cv.Schema({
-            cv.GenerateID(): cv.declare_id(stepper.Stepper),
+            cv.GenerateID(): cv.declare_id(TMC2209),
             cv.Required(CONF_STEP_PIN): pins.gpio_output_pin_schema,
             cv.Required(CONF_DIR_PIN): pins.gpio_output_pin_schema,
             cv.Optional(CONF_SLEEP_PIN): pins.gpio_output_pin_schema,
