@@ -20,8 +20,6 @@ CONF_REVERSE_DIRECTION = "reverse_direction"
 CONF_MICROSTEPS = "microsteps"
 CONF_TCOOL_THRESHOLD = "tcool_threshold"
 CONF_STALL_THRESHOLD = "stall_threshold"
-CONF_R_SHUNT = "r_shunt"
-CONF_TMC_ADDR = "tmc_address"
 # additional constants for the new configuration parameters
 CONF_UART_ADDRESS = "uart_address"
 CONF_SENSE_RESISTOR = "sense_resistor"
@@ -36,8 +34,8 @@ CONFIG_SCHEMA = cv.All(
             cv.Required(CONF_DIR_PIN): pins.gpio_output_pin_schema,
             cv.Optional(CONF_SLEEP_PIN): pins.gpio_output_pin_schema,
             cv.Optional(CONF_REVERSE_DIRECTION, default=False): cv.boolean,
-            cv.Optional(CONF_UART_ADDRESS, default=0b00): cv.hex_uint8_t,
-            cv.Optional(CONF_SENSE_RESISTOR, default=0.15): cv.float_,
+            cv.Required(CONF_UART_ADDRESS, default=0b00): cv.hex_uint8_t,
+            cv.Required(CONF_SENSE_RESISTOR, default=0.15): cv.float_,
         }).extend(stepper.STEPPER_SCHEMA)), cv.Length(min=1)),
     }).extend(cv.COMPONENT_SCHEMA)
     .extend(uart.UART_DEVICE_SCHEMA)
@@ -70,8 +68,8 @@ def to_code(config):
     cv.Schema(
         {
             cv.GenerateID(): cv.use_id(TMC2209),
-            cv.Required(CONF_R_SHUNT): cv.templatable(cv.resistance),
-            cv.Required(CONF_TMC_ADDR): cv.templatable(cv.uint8_t),
+            cv.Required(CONF_UART_ADDRESS, default=0b00): cv.hex_uint8_t,
+            cv.Required(CONF_SENSE_RESISTOR, default=0.15): cv.float_,
             cv.Optional(CONF_MICROSTEPS): cv.templatable(
                 cv.one_of(256, 128, 64, 32, 16, 8, 4, 2, 0)
             ),
@@ -96,11 +94,11 @@ def tmc2209_setup_to_code(config, action_id, template_arg, args):
     if CONF_CURRENT in config:
         template_ = yield cg.templatable(config[CONF_CURRENT], args, float)
         cg.add(var.set_current(template_))
-    if CONF_R_SHUNT in config:
-        template_ = yield cg.templatable(config[CONF_R_SHUNT], args, float)
+    if CONF_UART_ADDRESS in config:
+        template_ = yield cg.templatable(config[CONF_UART_ADDRESS], args, float)
         cg.add(var.set_r_shunt(template_))
-    if CONF_TMC_ADDR in config:
-        template_ = yield cg.templatable(config[CONF_TMC_ADDR], args, int)
+    if CONF_UART_ADDRESS in config:
+        template_ = yield cg.templatable(config[CONF_UART_ADDRESS], args, int)
         cg.add(var.set_tmc_address(template_))
 
     yield var
