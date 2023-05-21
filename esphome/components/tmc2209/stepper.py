@@ -22,21 +22,47 @@ CONF_TCOOL_THRESHOLD = "tcool_threshold"
 CONF_STALL_THRESHOLD = "stall_threshold"
 CONF_R_SHUNT = "r_shunt"
 CONF_TMC_ADDR = "tmc_address"
+# additional constants for the new configuration parameters
+CONF_UART_ADDRESS = "uart_address"
+CONF_SENSE_RESISTOR = "sense_resistor"
+CONF_STEPPERS = "steppers"
 
-
-CONFIG_SCHEMA = (
-    stepper.STEPPER_SCHEMA.extend(
-        {
-            cv.Required(CONF_ID): cv.declare_id(TMC2209),
+# modify CONFIG_SCHEMA to include the new parameters and to handle multiple steppers
+CONFIG_SCHEMA = cv.All(
+    cv.Schema({
+        cv.GenerateID(): cv.declare_id(TMC2209),
+        cv.Required(CONF_STEPPERS): cv.All(cv.ensure_list({
+            cv.GenerateID(): cv.declare_id(stepper.Stepper),
             cv.Required(CONF_STEP_PIN): pins.gpio_output_pin_schema,
             cv.Required(CONF_DIR_PIN): pins.gpio_output_pin_schema,
             cv.Optional(CONF_SLEEP_PIN): pins.gpio_output_pin_schema,
             cv.Optional(CONF_REVERSE_DIRECTION, default=False): cv.boolean,
-        }
-    )
-    .extend(cv.COMPONENT_SCHEMA)
+            cv.Optional(CONF_UART_ADDRESS, default=0b00): cv.hex_uint8_t,
+            cv.Optional(CONF_SENSE_RESISTOR, default=0.15): cv.float_,
+        }), cv.Length(min=1)),
+    }).extend(cv.COMPONENT_SCHEMA)
     .extend(uart.UART_DEVICE_SCHEMA)
 )
+
+# modify to_code to handle multiple steppers and to pass the new parameters
+def to_code(config):
+    for stepper_config in config[CONF_STEPPERS]:
+        step_pin = yield cg.gpio_pin_expression(stepper_config[CONF_STEP_PIN])
+        dir_pin = yield cg.gpio_pin_expression(stepper_config[CONF_DIR_PIN])
+        uart_address = stepper_config[CONF_UART_ADDRESS]
+        sense_resistor = stepper_config[CONF_SENSE_RESISTOR]
+
+        var = cg.new_Pvariable(
+            stepper_config[CONF_ID], step_pin, dir_pin, uart_address, sense_resistor, stepper_config[CONF_REVERSE_DIRECTION]
+        )
+        yield cg.register_component(var, config)
+        yield stepper.register_stepper(var, stepper_config)
+        yield uart.register_uart_device(var, config)
+
+        if CONF_SLEEP_PIN in stepper_config:
+            sleep_pin = yield cg.gpio_pin_expression(stepper_config[CONF_SLEEP_PIN])
+            cg.add(var.set_sleep_pin(sleep_pin))
+
 
 
 @automation.register_action(
@@ -80,21 +106,23 @@ def tmc2209_setup_to_code(config, action_id, template_arg, args):
 
     yield var
 
-
 def to_code(config):
-    step_pin = yield cg.gpio_pin_expression(config[CONF_STEP_PIN])
-    dir_pin = yield cg.gpio_pin_expression(config[CONF_DIR_PIN])
+    for stepper_config in config[CONF_STEPPERS]:
+        step_pin = yield cg.gpio_pin_expression(stepper_config[CONF_STEP_PIN])
+        dir_pin = yield cg.gpio_pin_expression(stepper_config[CONF_DIR_PIN])
+        uart_address = stepper_config[CONF_UART_ADDRESS]
+        sense_resistor = stepper_config[CONF_SENSE_RESISTOR]
 
-    var = cg.new_Pvariable(
-        config[CONF_ID], step_pin, dir_pin, config[CONF_REVERSE_DIRECTION]
-    )
-    yield cg.register_component(var, config)
-    yield stepper.register_stepper(var, config)
-    yield uart.register_uart_device(var, config)
+        var = cg.new_Pvariable(
+            stepper_config[CONF_ID], step_pin, dir_pin, uart_address, sense_resistor, stepper_config[CONF_REVERSE_DIRECTION]
+        )
+        yield cg.register_component(var, config)
+        yield stepper.register_stepper(var, stepper_config)
+        yield uart.register_uart_device(var, config)
 
-    if CONF_SLEEP_PIN in config:
-        sleep_pin = yield cg.gpio_pin_expression(config[CONF_SLEEP_PIN])
-        cg.add(var.set_sleep_pin(sleep_pin))
+        if CONF_SLEEP_PIN in stepper_config:
+            sleep_pin = yield cg.gpio_pin_expression(stepper_config[CONF_SLEEP_PIN])
+            cg.add(var.set_sleep_pin(sleep_pin))
 
     cg.add_library("SPI", None)
     cg.add_library("teemuatlut/TMCStepper", "0.7.1")

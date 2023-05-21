@@ -11,8 +11,8 @@ namespace tmc {
 
 class TMC2209 : public stepper::Stepper, public Component, public uart::UARTDevice {
  public:
-  TMC2209(GPIOPin *step_pin, GPIOPin *dir_pin, bool reverse_direction, float r_shunt, uint8_t tmc_address)
-      : step_pin_(step_pin), dir_pin_(dir_pin), reverse_direction_(reverse_direction), r_shunt_(r_shunt), tmc_address_(tmc_address) {}
+  TMC2209(GPIOPin *step_pin, GPIOPin *dir_pin, uint8_t uart_address, float sense_resistor, bool reverse_direction)
+      : step_pin_(step_pin), dir_pin_(dir_pin), uart_address_(uart_address), sense_resistor_(sense_resistor), reverse_direction_(reverse_direction) {}
 
   void set_sleep_pin(GPIOPin *sleep_pin) { this->sleep_pin_ = sleep_pin; }
   void setup() override;
@@ -30,8 +30,8 @@ class TMC2209 : public stepper::Stepper, public Component, public uart::UARTDevi
   GPIOPin *sleep_pin_{nullptr};
   bool sleep_pin_state_;
   HighFrequencyLoopRequester high_freq_;
-  double r_shunt_;
-  uint8_t tmc_address_;
+  uint8_t uart_address_;
+  float sense_resistor_;
 };
 
 template<typename... Ts> class TMC2209SetupAction : public Action<Ts...>, public Parented<TMC2209> {
