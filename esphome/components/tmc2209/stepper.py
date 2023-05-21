@@ -41,24 +41,7 @@ CONFIG_SCHEMA = cv.All(
     .extend(uart.UART_DEVICE_SCHEMA)
 )
 
-# modify to_code to handle multiple steppers and to pass the new parameters
-def to_code(config):
-    for stepper_config in config[CONF_STEPPERS]:
-        step_pin = yield cg.gpio_pin_expression(stepper_config[CONF_STEP_PIN])
-        dir_pin = yield cg.gpio_pin_expression(stepper_config[CONF_DIR_PIN])
-        uart_address = stepper_config[CONF_UART_ADDRESS]
-        sense_resistor = stepper_config[CONF_SENSE_RESISTOR]
 
-        var = cg.new_Pvariable(
-            stepper_config[CONF_ID], step_pin, dir_pin, uart_address, sense_resistor, stepper_config[CONF_REVERSE_DIRECTION]
-        )
-        yield cg.register_component(var, config)
-        yield stepper.register_stepper(var, stepper_config)
-        yield uart.register_uart_device(var, config)
-
-        if CONF_SLEEP_PIN in stepper_config:
-            sleep_pin = yield cg.gpio_pin_expression(stepper_config[CONF_SLEEP_PIN])
-            cg.add(var.set_sleep_pin(sleep_pin))
 
 
 
@@ -94,8 +77,8 @@ def tmc2209_setup_to_code(config, action_id, template_arg, args):
     if CONF_CURRENT in config:
         template_ = yield cg.templatable(config[CONF_CURRENT], args, float)
         cg.add(var.set_current(template_))
-    if CONF_UART_ADDRESS in config:
-        template_ = yield cg.templatable(config[CONF_UART_ADDRESS], args, float)
+    if CONF_SENSE_RESISTOR in config:
+        template_ = yield cg.templatable(config[CONF_SENSE_RESISTOR], args, float)
         cg.add(var.set_r_shunt(template_))
     if CONF_UART_ADDRESS in config:
         template_ = yield cg.templatable(config[CONF_UART_ADDRESS], args, int)
@@ -103,6 +86,7 @@ def tmc2209_setup_to_code(config, action_id, template_arg, args):
 
     yield var
 
+# modify to_code to handle multiple steppers and to pass the new parameters
 def to_code(config):
     for stepper_config in config[CONF_STEPPERS]:
         step_pin = yield cg.gpio_pin_expression(stepper_config[CONF_STEP_PIN])
