@@ -6,8 +6,8 @@ namespace tmc {
 
 static const char *TAG = "tmc2209.stepper";
 
-void TMC2209::setup() {
-  ESP_LOGCONFIG(TAG, "Setting up TMC2209...");
+void TMC2209B01::setup() {
+  ESP_LOGCONFIG(TAG, "Setting up TMC2209B01...");
 
   // this->get_stream()->write("Hello from UART");
 
@@ -33,14 +33,14 @@ void TMC2209::setup() {
   this->dir_pin_->setup();
   this->dir_pin_->digital_write(false);
 }
-void TMC2209::dump_config() {
-  ESP_LOGCONFIG(TAG, "TMC2209:");
+void TMC2209B01::dump_config() {
+  ESP_LOGCONFIG(TAG, "TMC2209B01:");
   LOG_PIN("  Step Pin: ", this->step_pin_);
   LOG_PIN("  Dir Pin: ", this->dir_pin_);
   LOG_PIN("  Sleep Pin: ", this->sleep_pin_);
   LOG_STEPPER(this);
 }
-void TMC2209::loop() {
+void TMC2209B01::loop() {
   bool at_target = this->has_reached_target();
   if (this->sleep_pin_ != nullptr) {
     bool sleep_rising_edge = !sleep_pin_state_ & !at_target;

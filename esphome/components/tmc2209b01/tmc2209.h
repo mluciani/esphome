@@ -9,9 +9,9 @@
 namespace esphome {
 namespace tmc {
 
-class TMC2209 : public stepper::Stepper, public Component, public uart::UARTDevice {
+class TMC2209B01 : public stepper::Stepper, public Component, public uart::UARTDevice {
  public:
-  TMC2209(GPIOPin *step_pin, GPIOPin *dir_pin, bool reverse_direction)
+  TMC2209B01(GPIOPin *step_pin, GPIOPin *dir_pin, bool reverse_direction)
       : step_pin_(step_pin), dir_pin_(dir_pin), reverse_direction_(reverse_direction) {}
 
   void set_sleep_pin(GPIOPin *sleep_pin) { this->sleep_pin_ = sleep_pin; }
@@ -32,7 +32,7 @@ class TMC2209 : public stepper::Stepper, public Component, public uart::UARTDevi
   HighFrequencyLoopRequester high_freq_;
 };
 
-template<typename... Ts> class TMC2209SetupAction : public Action<Ts...>, public Parented<TMC2209> {
+template<typename... Ts> class TMC2209B01SetupAction : public Action<Ts...>, public Parented<TMC2209B01> {
  public:
   TEMPLATABLE_VALUE(int, microsteps)
   TEMPLATABLE_VALUE(int, tcool_threshold)

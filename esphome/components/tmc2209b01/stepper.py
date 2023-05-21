@@ -13,8 +13,8 @@ from esphome.const import (
 
 
 tmc_ns = cg.esphome_ns.namespace("tmc")
-TMC2209 = tmc_ns.class_("TMC2209", stepper.Stepper, cg.Component)
-TMC2209SetupAction = tmc_ns.class_("TMC2209SetupAction", automation.Action)
+TMC2209B01 = tmc_ns.class_("TMC2209B01", stepper.Stepper, cg.Component)
+TMC2209B01SetupAction = tmc_ns.class_("TMC2209B01SetupAction", automation.Action)
 
 CONF_REVERSE_DIRECTION = "reverse_direction"
 CONF_MICROSTEPS = "microsteps"
@@ -24,7 +24,7 @@ CONF_STALL_THRESHOLD = "stall_threshold"
 CONFIG_SCHEMA = (
     stepper.STEPPER_SCHEMA.extend(
         {
-            cv.Required(CONF_ID): cv.declare_id(TMC2209),
+            cv.Required(CONF_ID): cv.declare_id(TMC2209B01),
             cv.Required(CONF_STEP_PIN): pins.gpio_output_pin_schema,
             cv.Required(CONF_DIR_PIN): pins.gpio_output_pin_schema,
             cv.Optional(CONF_SLEEP_PIN): pins.gpio_output_pin_schema,
@@ -38,10 +38,10 @@ CONFIG_SCHEMA = (
 
 @automation.register_action(
     "tmc2209b01.setup",
-    TMC2209SetupAction,
+    TMC2209B01SetupAction,
     cv.Schema(
         {
-            cv.GenerateID(): cv.use_id(TMC2209),
+            cv.GenerateID(): cv.use_id(TMC2209B01),
             cv.Optional(CONF_MICROSTEPS): cv.templatable(
                 cv.one_of(256, 128, 64, 32, 16, 8, 4, 2, 0)
             ),
