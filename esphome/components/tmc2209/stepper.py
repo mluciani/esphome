@@ -32,17 +32,14 @@ CONFIG_SCHEMA = cv.All(
             cv.GenerateID(): cv.declare_id(TMC2209),
             cv.Required(CONF_STEP_PIN): pins.gpio_output_pin_schema,
             cv.Required(CONF_DIR_PIN): pins.gpio_output_pin_schema,
+            cv.Required(CONF_UART_ADDRESS): cv.hex_uint8_t,
+            cv.Required(CONF_SENSE_RESISTOR): cv.float_,
             cv.Optional(CONF_SLEEP_PIN): pins.gpio_output_pin_schema,
             cv.Optional(CONF_REVERSE_DIRECTION, default=False): cv.boolean,
-            cv.Required(CONF_UART_ADDRESS, default=0b00): cv.hex_uint8_t,
-            cv.Required(CONF_SENSE_RESISTOR, default=0.15): cv.float_,
         }).extend(stepper.STEPPER_SCHEMA)), cv.Length(min=1)),
     }).extend(cv.COMPONENT_SCHEMA)
     .extend(uart.UART_DEVICE_SCHEMA)
 )
-
-
-
 
 
 @automation.register_action(
@@ -51,8 +48,8 @@ CONFIG_SCHEMA = cv.All(
     cv.Schema(
         {
             cv.GenerateID(): cv.use_id(TMC2209),
-            cv.Required(CONF_UART_ADDRESS, default=0b00): cv.hex_uint8_t,
-            cv.Required(CONF_SENSE_RESISTOR, default=0.15): cv.float_,
+            cv.Required(CONF_UART_ADDRESS): cv.hex_uint8_t,
+            cv.Required(CONF_SENSE_RESISTOR): cv.float_,
             cv.Optional(CONF_MICROSTEPS): cv.templatable(
                 cv.one_of(256, 128, 64, 32, 16, 8, 4, 2, 0)
             ),
