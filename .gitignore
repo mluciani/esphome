@@ -13,6 +13,9 @@ __pycache__/
 # Intellij Idea
 .idea
 
+# Vim
+*.swp
+
 # Hide some OS X stuff
 .DS_Store
 .AppleDouble
@@ -51,8 +54,10 @@ htmlcov/
 .coverage
 .coverage.*
 .cache
+.esphome
 nosetests.xml
 coverage.xml
+cov.xml
 *.cover
 .hypothesis/
 .pytest_cache/
@@ -72,6 +77,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+venv-*/
 
 # mypy
 .mypy_cache/
@@ -79,7 +85,8 @@ venv.bak/
 .pioenvs
 .piolibdeps
 .pio
-.vscode
+.vscode/
+!.vscode/tasks.json
 CMakeListsPrivate.txt
 CMakeLists.txt
 
@@ -96,8 +103,7 @@ CMakeLists.txt
 .idea/**/dynamic.xml
 
 # CMake
-cmake-build-debug/
-cmake-build-release/
+cmake-build-*/
 
 CMakeCache.txt
 CMakeFiles
@@ -117,3 +123,10 @@ config/
 tests/build/
 tests/.esphome/
 /.temp-clang-tidy.cpp
+/.temp/
+.pio/
+
+sdkconfig.*
+!sdkconfig.defaults
+
+.tests/

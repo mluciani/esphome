@@ -1,14 +1,15 @@
 #include "ads1115.h"
 #include "esphome/core/log.h"
+#include "esphome/core/hal.h"
 
 namespace esphome {
 namespace ads1115 {
 
-static const char *TAG = "ads1115";
+static const char *const TAG = "ads1115";
 static const uint8_t ADS1115_REGISTER_CONVERSION = 0x00;
 static const uint8_t ADS1115_REGISTER_CONFIG = 0x01;
 
-static const uint8_t ADS1115_DATA_RATE_860_SPS = 0b111;
+static const uint8_t ADS1115_DATA_RATE_860_SPS = 0b111;  // 3300_SPS for ADS1015
 
 void ADS1115Component::setup() {
   ESP_LOGCONFIG(TAG, "Setting up ADS1115...");
@@ -17,6 +18,9 @@ void ADS1115Component::setup() {
     this->mark_failed();
     return;
   }
+
+  ESP_LOGCONFIG(TAG, "Configuring ADS1115...");
+
   uint16_t config = 0;
   // Clear single-shot bit
   //        0b0xxxxxxxxxxxxxxx
@@ -64,11 +68,6 @@ void ADS1115Component::setup() {
     return;
   }
   this->prev_config_ = config;
-
-  for (auto *sensor : this->sensors_) {
-    this->set_interval(sensor->get_name(), sensor->update_interval(),
-                       [this, sensor] { this->request_measurement(sensor); });
-  }
 }
 void ADS1115Component::dump_config() {
   ESP_LOGCONFIG(TAG, "Setting up ADS1115...");
@@ -81,6 +80,7 @@ void ADS1115Component::dump_config() {
     LOG_SENSOR("  ", "Sensor", sensor);
     ESP_LOGCONFIG(TAG, "    Multiplexer: %u", sensor->get_multiplexer());
     ESP_LOGCONFIG(TAG, "    Gain: %u", sensor->get_gain());
+    ESP_LOGCONFIG(TAG, "    Resolution: %u", sensor->get_resolution());
   }
 }
 float ADS1115Component::request_measurement(ADS1115Sensor *sensor) {
@@ -107,17 +107,22 @@ float ADS1115Component::request_measurement(ADS1115Sensor *sensor) {
     }
     this->prev_config_ = config;
 
-    // about 1.6 ms with 860 samples per second
+    // about 1.2 ms with 860 samples per second
     delay(2);
 
-    uint32_t start = millis();
-    while (this->read_byte_16(ADS1115_REGISTER_CONFIG, &config) && (config >> 15) == 0) {
-      if (millis() - start > 100) {
-        ESP_LOGW(TAG, "Reading ADS1115 timed out");
-        this->status_set_warning();
-        return NAN;
+    // in continuous mode, conversion will always be running, rely on the delay
+    // to ensure conversion is taking place with the correct settings
+    // can we use the rdy pin to trigger when a conversion is done?
+    if (!this->continuous_mode_) {
+      uint32_t start = millis();
+      while (this->read_byte_16(ADS1115_REGISTER_CONFIG, &config) && (config >> 15) == 0) {
+        if (millis() - start > 100) {
+          ESP_LOGW(TAG, "Reading ADS1115 timed out");
+          this->status_set_warning();
+          return NAN;
+        }
+        yield();
       }
-      yield();
     }
   }
 
@@ -126,27 +131,45 @@ float ADS1115Component::request_measurement(ADS1115Sensor *sensor) {
     this->status_set_warning();
     return NAN;
   }
+
+  if (sensor->get_resolution() == ADS1015_12_BITS) {
+    bool negative = (raw_conversion >> 15) == 1;
+
+    // shift raw_conversion as it's only 12-bits, left justified
+    raw_conversion = raw_conversion >> (16 - ADS1015_12_BITS);
+
+    // check if number was negative in order to keep the sign
+    if (negative) {
+      // the number was negative
+      // 1) set the negative bit back
+      raw_conversion |= 0x8000;
+      // 2) reset the former (shifted) negative bit
+      raw_conversion &= 0xF7FF;
+    }
+  }
+
   auto signed_conversion = static_cast<int16_t>(raw_conversion);
 
   float millivolts;
+  float divider = (sensor->get_resolution() == ADS1115_16_BITS) ? 32768.0f : 2048.0f;
   switch (sensor->get_gain()) {
     case ADS1115_GAIN_6P144:
-      millivolts = signed_conversion * 0.187500f;
+      millivolts = (signed_conversion * 6144) / divider;
       break;
     case ADS1115_GAIN_4P096:
-      millivolts = signed_conversion * 0.125000f;
+      millivolts = (signed_conversion * 4096) / divider;
       break;
     case ADS1115_GAIN_2P048:
-      millivolts = signed_conversion * 0.062500f;
+      millivolts = (signed_conversion * 2048) / divider;
       break;
     case ADS1115_GAIN_1P024:
-      millivolts = signed_conversion * 0.031250f;
+      millivolts = (signed_conversion * 1024) / divider;
       break;
     case ADS1115_GAIN_0P512:
-      millivolts = signed_conversion * 0.015625f;
+      millivolts = (signed_conversion * 512) / divider;
       break;
     case ADS1115_GAIN_0P256:
-      millivolts = signed_conversion * 0.007813f;
+      millivolts = (signed_conversion * 256) / divider;
       break;
     default:
       millivolts = NAN;
@@ -159,7 +182,7 @@ float ADS1115Component::request_measurement(ADS1115Sensor *sensor) {
 float ADS1115Sensor::sample() { return this->parent_->request_measurement(this); }
 void ADS1115Sensor::update() {
   float v = this->parent_->request_measurement(this);
-  if (!isnan(v)) {
+  if (!std::isnan(v)) {
     ESP_LOGD(TAG, "'%s': Got Voltage=%fV", this->get_name().c_str(), v);
     this->publish_state(v);
   }

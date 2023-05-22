@@ -4,7 +4,7 @@
 namespace esphome {
 namespace template_ {
 
-static const char *TAG = "template.switch";
+static const char *const TAG = "template.switch";
 
 TemplateSwitch::TemplateSwitch() : turn_on_trigger_(new Trigger<>()), turn_off_trigger_(new Trigger<>()) {}
 
@@ -19,7 +19,7 @@ void TemplateSwitch::loop() {
 }
 void TemplateSwitch::write_state(bool state) {
   if (this->prev_trigger_ != nullptr) {
-    this->prev_trigger_->stop();
+    this->prev_trigger_->stop_action();
   }
 
   if (state) {
@@ -43,15 +43,16 @@ void TemplateSwitch::setup() {
   if (!this->restore_state_)
     return;
 
-  auto restored = this->get_initial_state();
-  if (!restored.has_value())
-    return;
+  optional<bool> initial_state = this->get_initial_state_with_restore_mode();
 
-  ESP_LOGD(TAG, "  Restored state %s", ONOFF(*restored));
-  if (*restored) {
-    this->turn_on();
-  } else {
-    this->turn_off();
+  if (initial_state.has_value()) {
+    ESP_LOGD(TAG, "  Restored state %s", ONOFF(initial_state.value()));
+    // if it has a value, restore_mode is not "DISABLED", therefore act on the switch:
+    if (initial_state.value()) {
+      this->turn_on();
+    } else {
+      this->turn_off();
+    }
   }
 }
 void TemplateSwitch::dump_config() {

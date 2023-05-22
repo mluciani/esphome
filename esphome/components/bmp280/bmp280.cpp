@@ -1,18 +1,22 @@
 #include "bmp280.h"
+#include "esphome/core/hal.h"
 #include "esphome/core/log.h"
 
 namespace esphome {
 namespace bmp280 {
 
-static const char *TAG = "bmp280.sensor";
+static const char *const TAG = "bmp280.sensor";
 
 static const uint8_t BMP280_REGISTER_STATUS = 0xF3;
 static const uint8_t BMP280_REGISTER_CONTROL = 0xF4;
 static const uint8_t BMP280_REGISTER_CONFIG = 0xF5;
 static const uint8_t BMP280_REGISTER_PRESSUREDATA = 0xF7;
 static const uint8_t BMP280_REGISTER_TEMPDATA = 0xFA;
+static const uint8_t BMP280_REGISTER_RESET = 0xE0;
 
 static const uint8_t BMP280_MODE_FORCED = 0b01;
+static const uint8_t BMP280_SOFT_RESET = 0xB6;
+static const uint8_t BMP280_STATUS_IM_UPDATE = 0b01;
 
 inline uint16_t combine_bytes(uint8_t msb, uint8_t lsb) { return ((msb & 0xFF) << 8) | (lsb & 0xFF); }
 
@@ -62,6 +66,28 @@ void BMP280Component::setup() {
   }
   if (chip_id != 0x58) {
     this->error_code_ = WRONG_CHIP_ID;
+    this->mark_failed();
+    return;
+  }
+
+  // Send a soft reset.
+  if (!this->write_byte(BMP280_REGISTER_RESET, BMP280_SOFT_RESET)) {
+    this->mark_failed();
+    return;
+  }
+  // Wait until the NVM data has finished loading.
+  uint8_t status;
+  uint8_t retry = 5;
+  do {
+    delay(2);
+    if (!this->read_byte(BMP280_REGISTER_STATUS, &status)) {
+      ESP_LOGW(TAG, "Error reading status register.");
+      this->mark_failed();
+      return;
+    }
+  } while ((status & BMP280_STATUS_IM_UPDATE) && (--retry));
+  if (status & BMP280_STATUS_IM_UPDATE) {
+    ESP_LOGW(TAG, "Timeout loading NVM.");
     this->mark_failed();
     return;
   }
@@ -123,11 +149,11 @@ inline uint8_t oversampling_to_time(BMP280Oversampling over_sampling) { return (
 void BMP280Component::update() {
   // Enable sensor
   ESP_LOGV(TAG, "Sending conversion request...");
-  uint8_t meas_register = 0;
-  meas_register |= (this->temperature_oversampling_ & 0b111) << 5;
-  meas_register |= (this->pressure_oversampling_ & 0b111) << 2;
-  meas_register |= 0b01;  // Forced mode
-  if (!this->write_byte(BMP280_REGISTER_CONTROL, meas_register)) {
+  uint8_t meas_value = 0;
+  meas_value |= (this->temperature_oversampling_ & 0b111) << 5;
+  meas_value |= (this->pressure_oversampling_ & 0b111) << 2;
+  meas_value |= 0b01;  // Forced mode
+  if (!this->write_byte(BMP280_REGISTER_CONTROL, meas_value)) {
     this->status_set_warning();
     return;
   }
@@ -139,7 +165,7 @@ void BMP280Component::update() {
   this->set_timeout("data", uint32_t(ceilf(meas_time)), [this]() {
     int32_t t_fine = 0;
     float temperature = this->read_temperature_(&t_fine);
-    if (isnan(temperature)) {
+    if (std::isnan(temperature)) {
       ESP_LOGW(TAG, "Invalid temperature, cannot read pressure values.");
       this->status_set_warning();
       return;
@@ -161,9 +187,10 @@ float BMP280Component::read_temperature_(int32_t *t_fine) {
     return NAN;
   int32_t adc = ((data[0] & 0xFF) << 16) | ((data[1] & 0xFF) << 8) | (data[2] & 0xFF);
   adc >>= 4;
-  if (adc == 0x80000)
+  if (adc == 0x80000) {
     // temperature was disabled
     return NAN;
+  }
 
   const int32_t t1 = this->calibration_.t1;
   const int32_t t2 = this->calibration_.t2;
@@ -183,9 +210,10 @@ float BMP280Component::read_pressure_(int32_t t_fine) {
     return NAN;
   int32_t adc = ((data[0] & 0xFF) << 16) | ((data[1] & 0xFF) << 8) | (data[2] & 0xFF);
   adc >>= 4;
-  if (adc == 0x80000)
+  if (adc == 0x80000) {
     // pressure was disabled
     return NAN;
+  }
   const int64_t p1 = this->calibration_.p1;
   const int64_t p2 = this->calibration_.p2;
   const int64_t p3 = this->calibration_.p3;

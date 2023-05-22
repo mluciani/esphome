@@ -3,6 +3,8 @@
 #include "esphome/core/component.h"
 #include "esphome/core/application.h"
 
+#include <vector>
+
 namespace esphome {
 namespace custom_component {
 
@@ -16,7 +18,7 @@ class CustomComponentConstructor {
     }
   }
 
-  Component *get_component(int i) { return this->components_[i]; }
+  Component *get_component(int i) const { return this->components_[i]; }
 
  protected:
   std::vector<Component *> components_;

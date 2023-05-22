@@ -1,10 +1,11 @@
 #include "template_sensor.h"
 #include "esphome/core/log.h"
+#include <cmath>
 
 namespace esphome {
 namespace template_ {
 
-static const char *TAG = "template.sensor";
+static const char *const TAG = "template.sensor";
 
 void TemplateSensor::update() {
   if (!this->f_.has_value())

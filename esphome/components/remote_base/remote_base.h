@@ -1,13 +1,14 @@
 #include <utility>
+#include <vector>
 
 #pragma once
 
 #include "esphome/core/component.h"
-#include "esphome/core/esphal.h"
+#include "esphome/core/hal.h"
 #include "esphome/core/automation.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
 
-#ifdef ARDUINO_ARCH_ESP32
+#ifdef USE_ESP32
 #include <driver/rmt.h>
 #endif
 
@@ -33,7 +34,7 @@ class RemoteTransmitData {
 
   const std::vector<int32_t> &get_data() const { return this->data_; }
 
-  void set_data(std::vector<int32_t> data) {
+  void set_data(const std::vector<int32_t> &data) {
     this->data_.clear();
     this->data_.reserve(data.size());
     for (auto dat : data)
@@ -116,6 +117,16 @@ class RemoteReceiveData {
     return false;
   }
 
+  bool expect_pulse_with_gap(uint32_t mark, uint32_t space) {
+    if (this->peek_mark(mark, 0) && this->peek_space_at_least(space, 1)) {
+      this->advance(2);
+      return true;
+    }
+    return false;
+  }
+
+  uint32_t get_index() { return index_; }
+
   void reset() { this->index_ = 0; }
 
   int32_t pos(uint32_t index) const { return (*this->data_)[index]; }
@@ -146,36 +157,39 @@ template<typename T> class RemoteProtocol {
 
 class RemoteComponentBase {
  public:
-  explicit RemoteComponentBase(GPIOPin *pin);
-
-#ifdef ARDUINO_ARCH_ESP32
-  void set_channel(rmt_channel_t channel) { this->channel_ = channel; }
-  void set_clock_divider(uint8_t clock_divider) { this->clock_divider_ = clock_divider; }
-#endif
+  explicit RemoteComponentBase(InternalGPIOPin *pin) : pin_(pin){};
 
  protected:
-#ifdef ARDUINO_ARCH_ESP32
-  uint32_t from_microseconds(uint32_t us) {
+  InternalGPIOPin *pin_;
+};
+
+#ifdef USE_ESP32
+class RemoteRMTChannel {
+ public:
+  explicit RemoteRMTChannel(uint8_t mem_block_num = 1);
+
+  void config_rmt(rmt_config_t &rmt);
+  void set_clock_divider(uint8_t clock_divider) { this->clock_divider_ = clock_divider; }
+
+ protected:
+  uint32_t from_microseconds_(uint32_t us) {
     const uint32_t ticks_per_ten_us = 80000000u / this->clock_divider_ / 100000u;
     return us * ticks_per_ten_us / 10;
   }
-  uint32_t to_microseconds(uint32_t ticks) {
+  uint32_t to_microseconds_(uint32_t ticks) {
     const uint32_t ticks_per_ten_us = 80000000u / this->clock_divider_ / 100000u;
     return (ticks * 10) / ticks_per_ten_us;
   }
-#endif
-
-  GPIOPin *pin_;
-#ifdef ARDUINO_ARCH_ESP32
+  RemoteComponentBase *remote_base_;
   rmt_channel_t channel_{RMT_CHANNEL_0};
+  uint8_t mem_block_num_;
   uint8_t clock_divider_{80};
-  esp_err_t error_code_{ESP_OK};
-#endif
 };
+#endif
 
 class RemoteTransmitterBase : public RemoteComponentBase {
  public:
-  RemoteTransmitterBase(GPIOPin *pin) : RemoteComponentBase(pin) {}
+  RemoteTransmitterBase(InternalGPIOPin *pin) : RemoteComponentBase(pin) {}
   class TransmitCall {
    public:
     explicit TransmitCall(RemoteTransmitterBase *parent) : parent_(parent) {}
@@ -218,7 +232,7 @@ class RemoteReceiverDumperBase {
 
 class RemoteReceiverBase : public RemoteComponentBase {
  public:
-  RemoteReceiverBase(GPIOPin *pin) : RemoteComponentBase(pin) {}
+  RemoteReceiverBase(InternalGPIOPin *pin) : RemoteComponentBase(pin) {}
   void register_listener(RemoteReceiverListener *listener) { this->listeners_.push_back(listener); }
   void register_dumper(RemoteReceiverDumperBase *dumper) {
     if (dumper->is_secondary()) {
@@ -271,7 +285,7 @@ class RemoteReceiverBinarySensorBase : public binary_sensor::BinarySensorInitial
                                        public Component,
                                        public RemoteReceiverListener {
  public:
-  explicit RemoteReceiverBinarySensorBase() : BinarySensorInitiallyOff() {}
+  explicit RemoteReceiverBinarySensorBase() {}
   void dump_config() override;
   virtual bool matches(RemoteReceiveData src) = 0;
   bool on_receive(RemoteReceiveData src) override {
@@ -320,6 +334,9 @@ template<typename... Ts> class RemoteTransmitterActionBase : public Action<Ts...
  public:
   void set_parent(RemoteTransmitterBase *parent) { this->parent_ = parent; }
 
+  TEMPLATABLE_VALUE(uint32_t, send_times);
+  TEMPLATABLE_VALUE(uint32_t, send_wait);
+
   void play(Ts... x) override {
     auto call = this->parent_->transmit();
     this->encode(call.get_data(), x...);
@@ -328,12 +345,9 @@ template<typename... Ts> class RemoteTransmitterActionBase : public Action<Ts...
     call.perform();
   }
 
+ protected:
   virtual void encode(RemoteTransmitData *dst, Ts... x) = 0;
 
-  TEMPLATABLE_VALUE(uint32_t, send_times);
-  TEMPLATABLE_VALUE(uint32_t, send_wait);
-
- protected:
   RemoteTransmitterBase *parent_{};
 };
 

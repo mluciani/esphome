@@ -1,35 +1,37 @@
 #pragma once
 
 #include "esphome/core/component.h"
+#include "esphome/core/entity_base.h"
 #include "esphome/core/preferences.h"
 #include "esphome/core/helpers.h"
 
 namespace esphome {
 namespace switch_ {
 
-#define LOG_SWITCH(prefix, type, obj) \
-  if (obj != nullptr) { \
-    ESP_LOGCONFIG(TAG, "%s%s '%s'", prefix, type, obj->get_name().c_str()); \
-    if (!obj->get_icon().empty()) { \
-      ESP_LOGCONFIG(TAG, "%s  Icon: '%s'", prefix, obj->get_icon().c_str()); \
-    } \
-    if (obj->assumed_state()) { \
-      ESP_LOGCONFIG(TAG, "%s  Assumed State: YES", prefix); \
-    } \
-    if (obj->is_inverted()) { \
-      ESP_LOGCONFIG(TAG, "%s  Inverted: YES", prefix); \
-    } \
-  }
+// bit0: on/off. bit1: persistent. bit2: inverted. bit3: disabled
+const int RESTORE_MODE_ON_MASK = 0x01;
+const int RESTORE_MODE_PERSISTENT_MASK = 0x02;
+const int RESTORE_MODE_INVERTED_MASK = 0x04;
+const int RESTORE_MODE_DISABLED_MASK = 0x08;
+
+enum SwitchRestoreMode {
+  SWITCH_ALWAYS_OFF = !RESTORE_MODE_ON_MASK,
+  SWITCH_ALWAYS_ON = RESTORE_MODE_ON_MASK,
+  SWITCH_RESTORE_DEFAULT_OFF = RESTORE_MODE_PERSISTENT_MASK,
+  SWITCH_RESTORE_DEFAULT_ON = RESTORE_MODE_PERSISTENT_MASK | RESTORE_MODE_ON_MASK,
+  SWITCH_RESTORE_INVERTED_DEFAULT_OFF = RESTORE_MODE_PERSISTENT_MASK | RESTORE_MODE_INVERTED_MASK,
+  SWITCH_RESTORE_INVERTED_DEFAULT_ON = RESTORE_MODE_PERSISTENT_MASK | RESTORE_MODE_INVERTED_MASK | RESTORE_MODE_ON_MASK,
+  SWITCH_RESTORE_DISABLED = RESTORE_MODE_DISABLED_MASK,
+};
 
 /** Base class for all switches.
  *
  * A switch is basically just a combination of a binary sensor (for reporting switch values)
  * and a write_state method that writes a state to the hardware.
  */
-class Switch : public Nameable {
+class Switch : public EntityBase, public EntityBase_DeviceClass {
  public:
   explicit Switch();
-  explicit Switch(const std::string &name);
 
   /** Publish a state to the front-end from the back-end.
    *
@@ -42,6 +44,9 @@ class Switch : public Nameable {
 
   /// The current reported state of the binary sensor.
   bool state;
+
+  /// Indicates whether or not state is to be retrieved from flash and how
+  SwitchRestoreMode restore_mode{SWITCH_RESTORE_DEFAULT_OFF};
 
   /** Turn this switch on. This is called by the front-end.
    *
@@ -70,19 +75,24 @@ class Switch : public Nameable {
    */
   void set_inverted(bool inverted);
 
-  /// Set the icon for this switch. "" for no icon.
-  void set_icon(const std::string &icon);
-
-  /// Get the icon for this switch. Using icon() if not manually set
-  std::string get_icon();
-
   /** Set callback for state changes.
    *
    * @param callback The void(bool) callback.
    */
   void add_on_state_callback(std::function<void(bool)> &&callback);
 
+  /** Returns the initial state of the switch, as persisted previously,
+    or empty if never persisted.
+   */
   optional<bool> get_initial_state();
+
+  /** Returns the initial state of the switch, after applying restore mode rules.
+   * If restore mode is disabled, this function will return an optional with no value
+   * (.has_value() is false), leaving it up to the component to decide the state.
+   * For example, the component could read the state from hardware and determine the current
+   * state.
+   */
+  optional<bool> get_initial_state_with_restore_mode();
 
   /** Return whether this switch uses an assumed state - i.e. if both the ON/OFF actions should be displayed in Home
    * Assistant because the real state is unknown.
@@ -92,6 +102,8 @@ class Switch : public Nameable {
   virtual bool assumed_state();
 
   bool is_inverted() const;
+
+  void set_restore_mode(SwitchRestoreMode restore_mode) { this->restore_mode = restore_mode; }
 
  protected:
   /** Write the given state to hardware. You should implement this
@@ -104,23 +116,14 @@ class Switch : public Nameable {
    */
   virtual void write_state(bool state) = 0;
 
-  /** Override this to set the Home Assistant icon for this switch.
-   *
-   * Return "" to disable this feature.
-   *
-   * @return The icon of this switch, for example "mdi:fan".
-   */
-  virtual std::string icon();  // NOLINT
-
-  uint32_t hash_base() override;
-
-  optional<std::string> icon_{};  ///< The icon shown here. Not set means use default from switch. Empty means no icon.
-
   CallbackManager<void(bool)> state_callback_{};
   bool inverted_{false};
   Deduplicator<bool> publish_dedup_;
   ESPPreferenceObject rtc_;
 };
+
+#define LOG_SWITCH(prefix, type, obj) log_switch((TAG), (prefix), LOG_STR_LITERAL(type), (obj))
+void log_switch(const char *tag, const char *prefix, const char *type, Switch *obj);
 
 }  // namespace switch_
 }  // namespace esphome

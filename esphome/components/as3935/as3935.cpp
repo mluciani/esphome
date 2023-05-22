@@ -4,7 +4,7 @@
 namespace esphome {
 namespace as3935 {
 
-static const char *TAG = "as3935";
+static const char *const TAG = "as3935";
 
 void AS3935Component::setup() {
   ESP_LOGCONFIG(TAG, "Setting up AS3935...");
@@ -26,6 +26,13 @@ void AS3935Component::setup() {
 void AS3935Component::dump_config() {
   ESP_LOGCONFIG(TAG, "AS3935:");
   LOG_PIN("  Interrupt Pin: ", this->irq_pin_);
+#ifdef USE_BINARY_SENSOR
+  LOG_BINARY_SENSOR("  ", "Thunder alert", this->thunder_alert_binary_sensor_);
+#endif
+#ifdef USE_SENSOR
+  LOG_SENSOR("  ", "Distance", this->distance_sensor_);
+  LOG_SENSOR("  ", "Lightning energy", this->energy_sensor_);
+#endif
 }
 
 float AS3935Component::get_setup_priority() const { return setup_priority::DATA; }
@@ -41,24 +48,31 @@ void AS3935Component::loop() {
     ESP_LOGI(TAG, "Disturber was detected - try increasing the spike rejection value!");
   } else if (int_value == LIGHTNING_INT) {
     ESP_LOGI(TAG, "Lightning has been detected!");
-    if (this->thunder_alert_binary_sensor_ != nullptr)
+#ifdef USE_BINARY_SENSOR
+    if (this->thunder_alert_binary_sensor_ != nullptr) {
       this->thunder_alert_binary_sensor_->publish_state(true);
+      this->set_timeout(10, [this]() { this->thunder_alert_binary_sensor_->publish_state(false); });
+    }
+#endif
+#ifdef USE_SENSOR
     uint8_t distance = this->get_distance_to_storm_();
     if (this->distance_sensor_ != nullptr)
       this->distance_sensor_->publish_state(distance);
+
     uint32_t energy = this->get_lightning_energy_();
     if (this->energy_sensor_ != nullptr)
       this->energy_sensor_->publish_state(energy);
+#endif
   }
-  this->thunder_alert_binary_sensor_->publish_state(false);
 }
 
 void AS3935Component::write_indoor(bool indoor) {
   ESP_LOGV(TAG, "Setting indoor to %d", indoor);
-  if (indoor)
+  if (indoor) {
     this->write_register(AFE_GAIN, GAIN_MASK, INDOOR, 1);
-  else
+  } else {
     this->write_register(AFE_GAIN, GAIN_MASK, OUTDOOR, 1);
+  }
 }
 // REG0x01, bits[3:0], manufacturer default: 0010 (2).
 // This setting determines the threshold for events that trigger the

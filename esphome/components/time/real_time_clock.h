@@ -1,10 +1,11 @@
 #pragma once
 
+#include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/helpers.h"
-#include <stdlib.h>
-#include <time.h>
 #include <bitset>
+#include <cstdlib>
+#include <ctime>
 
 namespace esphome {
 namespace time {
@@ -29,13 +30,10 @@ struct ESPTime {
   uint8_t month;
   /// year
   uint16_t year;
-  /// daylight savings time flag
+  /// daylight saving time flag
   bool is_dst;
-  union {
-    ESPDEPRECATED(".time is deprecated, use .timestamp instead") time_t time;
-    /// unix epoch time (seconds since UTC Midnight January 1, 1970)
-    time_t timestamp;
-  };
+  /// unix epoch time (seconds since UTC Midnight January 1, 1970)
+  time_t timestamp;
 
   /** Convert this ESPTime struct to a null-terminated c string buffer as specified by the format argument.
    * Up to buffer_len bytes are written.
@@ -90,8 +88,12 @@ struct ESPTime {
   /// Convert this ESPTime instance back to a tm struct.
   struct tm to_c_tm();
 
+  static int32_t timezone_offset();
+
   /// Increment this clock instance by one second.
   void increment_second();
+  /// Increment this clock instance by one day.
+  void increment_day();
   bool operator<(ESPTime other);
   bool operator<=(ESPTime other);
   bool operator==(ESPTime other);
@@ -105,7 +107,7 @@ struct ESPTime {
 /// The C library (newlib) available on ESPs only supports TZ strings that specify an offset and DST info;
 /// you cannot specify zone names or paths to zoneinfo files.
 /// \see https://www.gnu.org/software/libc/manual/html_node/TZ-Variable.html
-class RealTimeClock : public Component {
+class RealTimeClock : public PollingComponent {
  public:
   explicit RealTimeClock();
 
@@ -126,11 +128,27 @@ class RealTimeClock : public Component {
 
   void call_setup() override;
 
+  void add_on_time_sync_callback(std::function<void()> callback) {
+    this->time_sync_callback_.add(std::move(callback));
+  };
+
  protected:
   /// Report a unix epoch as current time.
   void synchronize_epoch_(uint32_t epoch);
 
   std::string timezone_{};
+  void apply_timezone_();
+
+  CallbackManager<void()> time_sync_callback_;
+};
+
+template<typename... Ts> class TimeHasTimeCondition : public Condition<Ts...> {
+ public:
+  TimeHasTimeCondition(RealTimeClock *parent) : parent_(parent) {}
+  bool check(Ts... x) override { return this->parent_->now().is_valid(); }
+
+ protected:
+  RealTimeClock *parent_;
 };
 
 }  // namespace time
