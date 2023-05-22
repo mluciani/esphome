@@ -33,7 +33,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Required(CONF_STEP_PIN): pins.gpio_output_pin_schema,
             cv.Required(CONF_DIR_PIN): pins.gpio_output_pin_schema,
             cv.Required(CONF_UART_ADDRESS): cv.hex_uint8_t,
-            cv.Required(CONF_SENSE_RESISTOR): cv.float_,
+            cv.Required(CONF_SENSE_RESISTOR): cv.resistance,
             cv.Optional(CONF_SLEEP_PIN): pins.gpio_output_pin_schema,
             cv.Optional(CONF_REVERSE_DIRECTION, default=False): cv.boolean,
         }).extend(stepper.STEPPER_SCHEMA)), cv.Length(min=1)),
@@ -49,7 +49,7 @@ CONFIG_SCHEMA = cv.All(
         {
             cv.GenerateID(): cv.use_id(TMC2209),
             cv.Required(CONF_UART_ADDRESS): cv.hex_uint8_t,
-            cv.Required(CONF_SENSE_RESISTOR): cv.float_,
+            cv.Required(CONF_SENSE_RESISTOR): cv.resistance,
             cv.Optional(CONF_MICROSTEPS): cv.templatable(
                 cv.one_of(256, 128, 64, 32, 16, 8, 4, 2, 0)
             ),
@@ -76,10 +76,10 @@ def tmc2209_setup_to_code(config, action_id, template_arg, args):
         cg.add(var.set_current(template_))
     if CONF_SENSE_RESISTOR in config:
         template_ = yield cg.templatable(config[CONF_SENSE_RESISTOR], args, float)
-        cg.add(var.set_r_shunt(template_))
+        cg.add(var.set_sense_resistor(template_))
     if CONF_UART_ADDRESS in config:
         template_ = yield cg.templatable(config[CONF_UART_ADDRESS], args, int)
-        cg.add(var.set_tmc_address(template_))
+        cg.add(var.set_uart_address(template_))
 
     yield var
 

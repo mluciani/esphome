@@ -40,8 +40,8 @@ template<typename... Ts> class TMC2209SetupAction : public Action<Ts...>, public
   TEMPLATABLE_VALUE(int, tcool_threshold)
   TEMPLATABLE_VALUE(int, stall_threshold)
   TEMPLATABLE_VALUE(float, current)
-  TEMPLATABLE_VALUE(double, uart_address)
-  TEMPLATABLE_VALUE(uint8_t, sense_resistor)
+  TEMPLATABLE_VALUE(uint8_t, uart_address)
+  TEMPLATABLE_VALUE(float, sense_resistor)
 
   void play(Ts... x) override {
     auto driver = this->parent_->get_driver();
@@ -61,11 +61,11 @@ template<typename... Ts> class TMC2209SetupAction : public Action<Ts...>, public
       ESP_LOGW("tmc2209", "current %.3f", this->current_.value(x...));
       driver.rms_current(static_cast<int>(this->current_.value(x...) * 1000.0));
     }
-    if (this.uart_address_.has_value()) {
-      ESP_LOGW("tmc2209", "uart_address_ %d", this.uart_address_.value(x...));
+    if (this->uart_address_.has_value()) {
+      ESP_LOGW("tmc2209", "uart_address 0x%02X", this->uart_address_.value(x...));
     }
-    if (this.sense_resistor_.has_value()) {
-      ESP_LOGW("tmc2209", "sense_resistor_ %.3f", this.sense_resistor_.value(x...));
+    if (this->sense_resistor_.has_value()) {
+      ESP_LOGW("tmc2209", "sense_resistor %.3f", this->sense_resistor_.value(x...));
     }
   }
 };
