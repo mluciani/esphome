@@ -1,0 +1,338 @@
+substitutions:
+  device_name: "fysetc-stepper"
+  #pulley_diameter_mm: "21.963"
+  #gear_ratio: "1880/2000"
+  #distance_mm: "2050"
+  acceleration: 500 steps/s^2
+  velocity: 2500 steps/s # 200 (motor steps) * ${microsteps}
+  back_off_steps: "200" # back off some steps to reduce stepper energize noise
+
+  # Stepper X config
+  open_current_x: 1000ma
+  open_stall_threshold_x: "28"
+  close_current_x: 300ma
+  close_stall_threshold_x: "30"
+  tcool_threshold_x: "1000"
+  change_direction_x: "True"
+  tmc_address_x: "0x01"
+
+  # Stepper Y config
+  open_current_y: 1000ma
+  open_stall_threshold_y: "28"
+  close_current_y: 300ma
+  close_stall_threshold_y: "30"
+  tcool_threshold_y: "1000"
+  change_direction_y: "False"
+  tmc_address_y: "0x02"
+
+  sense_resistor: "0.15"
+
+external_components:
+  source: github://mluciani/esphome@stepper-tmc2209-new_uart
+  components: [uart, tmc2209]
+
+esphome:
+  name: ${device_name}
+  platform: ESP32
+  board: nodemcu-32s
+  platformio_options:
+    upload_speed: 921600
+
+  on_boot:
+    - tmc2209.setup:
+        id: stepper_x
+        microsteps: 16
+        tcool_threshold: ${tcool_threshold_x}
+        current: ${open_current_x}
+        stall_threshold: ${open_stall_threshold_x}
+        sense_resistor: ${sense_resistor}
+        uart_address: ${tmc_address_x}
+    - tmc2209.setup:
+        id: stepper_y
+        microsteps: 16
+        tcool_threshold: ${tcool_threshold_y}
+        current: ${open_current_y}
+        stall_threshold: ${open_stall_threshold_y}
+        sense_resistor: ${sense_resistor}
+        uart_address: ${tmc_address_y}
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+web_server: 
+  port: 80
+
+logger:
+  level: INFO
+
+ota:
+  - platform: esphome
+    password: !secret ota_pass
+
+uart:
+  id: uart_stepper
+  tx_pin: GPIO22
+  rx_pin: GPIO21
+  baud_rate: 9600
+
+api:
+  encryption:
+    key: !secret encrypt_key
+  services:
+    - service: control_stepper
+      variables:
+        stepper_id: string
+        target: int
+        speed: int
+        microsteps: int
+        tcool_threshold: int
+        stall_threshold: int
+        rms_current_amps: float
+      then:
+        - if:
+            condition:
+              lambda: 'return stepper_id == "stepper_x";'
+            then:
+              - tmc2209.setup:
+                  id: stepper_x
+                  microsteps: !lambda "return microsteps;"
+                  tcool_threshold: !lambda "return tcool_threshold;"
+                  stall_threshold: !lambda "return stall_threshold;"
+                  current: !lambda "return rms_current_amps;"
+                  sense_resistor: ${sense_resistor}
+                  uart_address: ${tmc_address_x}
+              - logger.log:
+                  format: moving to %d
+                  args: [target]
+              - stepper.set_speed:
+                  id: stepper_x
+                  speed: !lambda "return speed;"
+              - stepper.set_target:
+                  id: stepper_x
+                  target: !lambda "return target;"
+        - if:
+            condition:
+              lambda: 'return stepper_id == "stepper_y";'
+            then:
+              - tmc2209.setup:
+                  id: stepper_y
+                  microsteps: !lambda "return microsteps;"
+                  tcool_threshold: !lambda "return tcool_threshold;"
+                  stall_threshold: !lambda "return stall_threshold;"
+                  current: !lambda "return rms_current_amps;"
+                  sense_resistor: ${sense_resistor}
+                  uart_address: ${tmc_address_y}
+              - logger.log:
+                  format: moving stepper_y to %d
+                  args: [target]
+              - stepper.set_speed:
+                  id: stepper_y
+                  speed: !lambda "return speed;"
+              - stepper.set_target:
+                  id: stepper_y
+                  target: !lambda "return target;"
+
+# Stepper configuration
+stepper:
+  - platform: tmc2209
+    steppers:
+    - id: stepper_x
+      step_pin: GPIO27
+      dir_pin:
+        number: GPIO26
+        inverted: ${change_direction_x}
+      sleep_pin:
+        number: GPIO25
+        inverted: true
+      acceleration: ${acceleration}
+      deceleration: ${acceleration}
+      max_speed: ${velocity}
+      sense_resistor: ${sense_resistor}
+      uart_address: ${tmc_address_x}
+    - id: stepper_y
+      step_pin: GPIO33
+      dir_pin:
+        number: GPIO32
+        inverted: ${change_direction_y}
+      sleep_pin:
+        number: GPIO25
+        inverted: true
+      acceleration: ${acceleration}
+      deceleration: ${acceleration}
+      max_speed: ${velocity}
+      sense_resistor: ${sense_resistor}
+      uart_address: ${tmc_address_y}
+
+# input_boolean:
+#   stepper_stalled:
+#     name: Stepper Stalled
+#     initial: off
+#     icon: mdi:alert
+
+# automation:
+#   - alias: 'Handle Stepper Stall'
+#     trigger:
+#       platform: state
+#       entity_id: input_boolean.stepper_stalled
+#       to: 'on'
+#     action:
+#       - service: script.handle_stepper_stall
+script:
+  - id: stop_at_current_position
+    parameters:
+      stepper_id: string
+    then:
+      - if:
+          condition:
+            lambda:  'return stepper_id == "stepper_x";'
+          then:
+            stepper.set_target:
+              id: stepper_x
+              target: !lambda "return id(stepper_x).current_position;"
+      - if:
+          condition:
+            lambda:  'return stepper_id == "stepper_y";'
+          then:
+            stepper.set_target:
+              id: stepper_y
+              target: !lambda "return id(stepper_y).current_position;"
+
+  - id: extend_blinds
+    parameters:
+      stepper_id: string
+    then:
+      - if:
+          condition:
+            lambda: 'return stepper_id == "stepper_x";'
+          then:
+            - logger.log: "Extending blinds..."
+            - stepper.set_target:
+                id: stepper_x
+                target: 9000  # Adjust as necessary
+      - if:
+          condition:
+            lambda: 'return stepper_id == "stepper_y";'
+          then:
+            - logger.log: "Extending blinds (stepper_y)..."
+            - stepper.set_target:
+                id: stepper_y
+                target: 9000  # Adjust as necessary
+
+# script:
+#   handle_stepper_stall:
+#     alias: Handle Stepper Stall
+#     sequence:
+#       - service: notify.notify
+#         data:
+#           message: 'Stepper motor has stalled and has been stopped.'
+#       - delay: '00:00:05'
+#       - service: input_boolean.turn_off
+#         entity_id: input_boolean.stepper_stalled
+
+#   retract_blinds:
+#     alias: Retract Blinds
+#     sequence:
+#       - if:
+#           condition:
+#             binary_sensor.is_off: stepper_stall_sensor
+#           then:
+#             - logger.log: "Retracting blinds..."
+#             - tmc2209.setup:
+#                 id: stepper_x
+#                 current: ${close_current_x}
+#                 stall_threshold: ${close_stall_threshold_x}
+#             - stepper.set_target:
+#                 id: stepper_x
+#                 target: 0
+#             - while:
+#                 condition:
+#                   lambda: 'return id(stepper_x).is_running();'
+#                 then:
+#                   - delay: 100ms
+#                   - if:
+#                       condition:
+#                         lambda: 'return id(stepper_x).is_stalled();'
+#                       then:
+#                         - logger.log: "Motor stalled, stopping retraction."
+#                         - stepper.stop:
+#                             id: stepper_x
+#                         - homeassistant.service:
+#                             service: input_boolean.turn_on
+#                             data:
+#                               entity_id: input_boolean.stepper_stalled
+#                         - break
+#           else:
+#             - logger.log: "Cannot retract, motor is stalled."
+
+binary_sensor:
+  - platform: gpio
+    pin: GPIO34
+    name: "Stepper Stall Sensor"
+    id: stepper_stall_sensor
+    filters:
+      - delayed_on: 10ms # debounce to avoid false positives
+    on_press:
+      then:
+        #- logger.log: "Stall detected, stopping stepper motor."
+        stepper.set_target:
+          id: stepper_x
+          target: !lambda 'return id(stepper_x).current_position;'
+        # - homeassistant.service:
+        #     service: input_boolean.turn_on
+        #     data:
+        #       entity_id: input_boolean.stepper_stalled
+        
+  - platform: gpio
+    pin: GPIO35
+    name: "Stepper Y Stall Sensor"
+    id: stepper_y_stall_sensor
+    filters:
+      - delayed_on: 10ms
+    on_press:
+      then:
+        stepper.set_target:
+          id: stepper_y
+          target: !lambda 'return id(stepper_y).current_position;'
+
+  - platform: homeassistant
+    name: "Turn Stepper On"
+    entity_id: switch.stepper_on
+    on_press:
+      then:
+        - stepper.set_target:
+            id: stepper_x
+            target: 2000  # Arbitrary large number for continuous movement
+
+  - platform: homeassistant
+    name: "Turn Stepper Off"
+    entity_id: switch.stepper_off
+    on_press:
+      then:
+        - stepper.set_target:
+            id: stepper_x
+            target: !lambda 'return id(stepper_x).current_position;'
+
+  # - platform: homeassistant
+  #   name: "Reverse Direction"
+  #   entity_id: switch.stepper_reverse
+  #   on_press:
+  #     then:
+  #       - stepper.set_direction:
+  #           id: stepper_motor
+  #           forward: !lambda 'return !id(stepper_motor).direction_forward;'
+
+# Simple web interface
+sensor:
+  - platform: template
+    name: "Stepper X Position"
+    id: stepper_x_position
+    lambda: 'return id(stepper_x).current_position;'
+    update_interval: 5s
+
+  - platform: template
+    name: "Stepper Y Position"
+    id: stepper_y_position
+    lambda: 'return id(stepper_y).current_position;'
+    update_interval: 5s
+

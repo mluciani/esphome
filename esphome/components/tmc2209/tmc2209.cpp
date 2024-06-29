@@ -7,9 +7,7 @@ namespace tmc {
 static const char *TAG = "tmc2209.stepper";
 
 void TMC2209::setup() {
-  ESP_LOGCONFIG(TAG, "Setting up TMC2209...");
-
-  // this->get_stream()->write("Hello from UART");
+  ESP_LOGCONFIG(TAG, "Setting up TMC2209 '%s'...", this->name_.c_str());
 
   stepper_driver_ = new TMC2209Stepper(this->get_stream(), sense_resistor_, uart_address_);
 
@@ -33,12 +31,13 @@ void TMC2209::setup() {
   this->dir_pin_->setup();
   this->dir_pin_->digital_write(false);
 }
+
 void TMC2209::dump_config() {
-  ESP_LOGCONFIG(TAG, "TMC2209:");
+  ESP_LOGCONFIG(TAG, "TMC2209 '%s':", this->name_.c_str());
   LOG_PIN("  Step Pin: ", this->step_pin_);
   LOG_PIN("  Dir Pin: ", this->dir_pin_);
   LOG_PIN("  Sleep Pin: ", this->sleep_pin_);
-  ESP_LOGCONFIG(TAG, "  Current Sense Resistor: %f", this->sense_resistor_);
+  ESP_LOGCONFIG(TAG, "  Current Sense Resistor: %.3f", this->sense_resistor_);
   ESP_LOGCONFIG(TAG, "  TMC Address: 0x%02X", this->uart_address_);
   LOG_STEPPER(this);
 }
