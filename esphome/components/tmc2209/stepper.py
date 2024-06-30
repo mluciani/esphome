@@ -52,6 +52,8 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_MICROSTEPS): cv.templatable(
                 cv.one_of(256, 128, 64, 32, 16, 8, 4, 2, 0)
             ),
+            cv.Required(CONF_UART_ADDRESS): cv.hex_uint8_t,
+            cv.Required(CONF_SENSE_RESISTOR): cv.resistance,
             cv.Optional(CONF_TCOOL_THRESHOLD): cv.templatable(cv.int_),
             cv.Optional(CONF_STALL_THRESHOLD): cv.templatable(cv.int_),
             cv.Optional(CONF_CURRENT): cv.templatable(cv.current),
