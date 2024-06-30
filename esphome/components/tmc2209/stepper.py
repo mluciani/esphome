@@ -9,6 +9,7 @@ from esphome.const import (
     CONF_ID,
     CONF_SLEEP_PIN,
     CONF_STEP_PIN,
+    CONF_NAME,
 )
 
 
