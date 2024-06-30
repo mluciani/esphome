@@ -8,8 +8,16 @@ static const char *TAG = "tmc2209.stepper";
 
 void TMC2209::setup() {
   ESP_LOGCONFIG(TAG, "Setting up TMC2209 '%s'...", this->name_.c_str());
+  ESP_LOGD(TAG, "UART Address: 0x%02X", this->uart_address_);
 
   stepper_driver_ = new TMC2209Stepper(this->get_stream(), sense_resistor_, uart_address_);
+
+  if (stepper_driver_ == nullptr) {
+    ESP_LOGE(TAG, "Failed to allocate memory for TMC2209Stepper");
+    return;
+  }
+
+  ESP_LOGD(TAG, "TMC2209Stepper object created successfully");
 
   stepper_driver_->pdn_disable(true);
   stepper_driver_->begin();
@@ -30,6 +38,8 @@ void TMC2209::setup() {
   this->step_pin_->digital_write(false);
   this->dir_pin_->setup();
   this->dir_pin_->digital_write(false);
+
+  ESP_LOGD(TAG, "TMC2209 setup complete for stepper %s", this->name_.c_str());
 }
 
 void TMC2209::dump_config() {
