@@ -1,0 +1,76 @@
+#pragma once
+
+#include "esphome/core/component.h"
+#include "esphome/components/stepper/stepper.h"
+#include "esphome/components/uart/uart.h"
+
+#include <TMCStepper.h>
+
+namespace esphome {
+namespace tmc {
+
+class TMC22092 : public stepper::Stepper, public Component, public uart::UARTDevice {
+ public:
+  TMC22092(const std::string &name, GPIOPin *step_pin, GPIOPin *dir_pin, uint8_t uart_address, float sense_resistor, bool reverse_direction)
+      : name_(name), step_pin_(step_pin), dir_pin_(dir_pin), uart_address_(uart_address), sense_resistor_(sense_resistor), reverse_direction_(reverse_direction) {}
+
+  void set_sleep_pin(GPIOPin *sleep_pin) { this->sleep_pin_ = sleep_pin; }
+  void setup() override;
+  void dump_config() override;
+  void loop() override;
+  float get_setup_priority() const override { return setup_priority::HARDWARE; }
+
+  const TMC22092Stepper &get_driver() const { return *this->stepper_driver_; }
+  const std::string &get_name() const { return name_; }
+
+ protected:
+  std::string name_;
+  GPIOPin *step_pin_;
+  GPIOPin *dir_pin_;
+  bool reverse_direction_;
+  TMC22092Stepper *stepper_driver_;
+  GPIOPin *sleep_pin_{nullptr};
+  bool sleep_pin_state_;
+  HighFrequencyLoopRequester high_freq_;
+  uint8_t uart_address_;
+  float sense_resistor_;
+};
+
+template<typename... Ts> class TMC22092SetupAction : public Action<Ts...>, public Parented<TMC22092> {
+ public:
+  TEMPLATABLE_VALUE(int, microsteps)
+  TEMPLATABLE_VALUE(int, tcool_threshold)
+  TEMPLATABLE_VALUE(int, stall_threshold)
+  TEMPLATABLE_VALUE(float, current)
+  TEMPLATABLE_VALUE(uint8_t, uart_address)
+  TEMPLATABLE_VALUE(float, sense_resistor)
+
+  void play(Ts... x) override {
+    auto driver = this->parent_->get_driver();
+    if (this->microsteps_.has_value()) {
+      ESP_LOGW("tmc22092", "microsteps %d", this->microsteps_.value(x...));
+      driver.microsteps(this->microsteps_.value(x...));
+    }
+    if (this->tcool_threshold_.has_value()) {
+      ESP_LOGW("tmc22092", "tcool_threshold %d", this->tcool_threshold_.value(x...));
+      driver.TCOOLTHRS(this->tcool_threshold_.value(x...));
+    }
+    if (this->stall_threshold_.has_value()) {
+      ESP_LOGW("tmc22092", "stall %d", this->stall_threshold_.value(x...));
+      driver.SGTHRS(this->stall_threshold_.value(x...));
+    }
+    if (this->current_.has_value()) {
+      ESP_LOGW("tmc22092", "current %.3f", this->current_.value(x...));
+      driver.rms_current(static_cast<int>(this->current_.value(x...) * 1000.0));
+    }
+    if (this->uart_address_.has_value()) {
+      ESP_LOGW("tmc22092", "uart_address 0x%02X", this->uart_address_.value(x...));
+    }
+    if (this->sense_resistor_.has_value()) {
+      ESP_LOGW("tmc22092", "sense_resistor %.3f", this->sense_resistor_.value(x...));
+    }
+  }
+};
+
+}  // namespace tmc
+}  // namespace esphome
